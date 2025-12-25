@@ -15,7 +15,7 @@
 
 <p align="center">
   || <a href="https://arxiv.org/pdf/2511.21367">Paper</a>
-  || <a href="https://arxiv.org/abs/2511.21367">arXiv</a> 
+  || <a href="https://arxiv.org/abs/2511.21367">arXiv</a> || 
 </p>
 
 This repository contains the **official implementation** of the paper:
