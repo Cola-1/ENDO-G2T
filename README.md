@@ -1,7 +1,7 @@
 #  ENDO-G2T: Geometry-Guided and Temporally Aware Time-Embedded 4D Gaussian Splatting for Endoscopic Scenes
 
 <p align="center">
-  <img src="assets/fig1.png" alt="CountingFruit Teaser" width="95%">
+  <img src="assets/1.png" alt="CountingFruit Teaser" width="95%">
 </p>
 
 This repository contains the **official implementation** of the paper:
