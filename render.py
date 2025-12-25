@@ -1,0 +1,302 @@
+import sys
+
+import imageio
+import numpy as np
+import torch
+from omegaconf import OmegaConf, DictConfig
+
+from scene import Scene
+import os
+from tqdm import tqdm
+from os import makedirs
+from gaussian_renderer import render
+import torchvision
+from utils.general_utils import safe_state
+from argparse import ArgumentParser
+from arguments import ModelParams, PipelineParams, OptimizationParams, ModelHiddenParams
+from gaussian_renderer import GaussianModel
+from time import time
+import open3d as o3d
+from utils.graphics_utils import fov2focal
+
+to8b = lambda x: (255 * np.clip(x.cpu().numpy(), 0, 1)).astype(np.uint8)
+
+def render_set(model_path, name, iteration, views, gaussians, pipeline, background, reconstruct=False, measure_raster_only: bool = False):
+
+    if iteration is None:
+        iteration = 'best'
+
+    render_path = os.path.join(model_path, name, "ours_{}".format(iteration), "renders")
+    depth_path = os.path.join(model_path, name, "ours_{}".format(iteration), "depth")
+    gts_path = os.path.join(model_path, name, "ours_{}".format(iteration), "gt")
+    gtdepth_path = os.path.join(model_path, name, "ours_{}".format(iteration), "gt_depth")
+    masks_path = os.path.join(model_path, name, "ours_{}".format(iteration), "masks")
+    normal_path = os.path.join(model_path, name, "ours_{}".format(iteration), "normal")
+    uncertainty_path = os.path.join(model_path, name, "ours_{}".format(iteration), "uncertainty")
+    pcd_path = os.path.join(model_path, name, "ours_{}".format(iteration), "pcd")
+
+    makedirs(render_path, exist_ok=True)
+    makedirs(normal_path, exist_ok=True)
+    makedirs(uncertainty_path, exist_ok=True)
+    makedirs(depth_path, exist_ok=True)
+    makedirs(gts_path, exist_ok=True)
+    makedirs(gtdepth_path, exist_ok=True)
+    makedirs(masks_path, exist_ok=True)
+    makedirs(pcd_path, exist_ok=True)
+
+    render_images = []
+    render_depths = []
+    render_normal = []
+    uncertainty = []
+    gt_list = []
+    gt_depths = []
+    mask_list = []
+
+    test_times = 1
+
+    # Optional: raster-only FPS measurement (no CPU copies or saving)
+    # Move all views to CUDA once to avoid repeated transfers
+    views_cuda = [(gt_img, v.cuda()) for gt_img, v in views]
+    if measure_raster_only:
+        torch.cuda.synchronize()
+        t0 = time()
+        for _, v in views_cuda:
+            _ = render(v, gaussians, pipeline, background)
+        torch.cuda.synchronize()
+        t1 = time()
+        print("[FPS] Raster-only FPS:", len(views_cuda) / (t1 - t0))
+
+    # Time only the GPU render passes; defer CPU copies until after timing
+    gpu_renders = []
+    gpu_depths = []
+    torch.cuda.synchronize()
+    time1 = time()
+    for idx, (gt_img, v) in enumerate(views_cuda):
+        rendering = render(v, gaussians, pipeline, background)
+        gpu_depths.append(rendering["depth"])  # keep on GPU
+        gpu_renders.append(rendering["render"])  # keep on GPU
+
+        if name in ["train", "test", "video"]:
+            gt = gt_img[0:3, :, :]
+            gt_list.append(gt)
+            mask = v.mask
+            mask_list.append(mask)
+            gt_depth = v.depth
+            gt_depths.append(gt_depth)
+    torch.cuda.synchronize()
+    time2 = time()
+
+    print("FPS:", (len(views) - 1) * test_times / (time2 - time1))
+
+    # Now perform CPU copies for saving without affecting measured FPS
+    for d in gpu_depths:
+        render_depths.append(d)
+    for r in gpu_renders:
+        render_images.append(r.cpu())
+
+    # import pdb; pdb.set_trace()
+    count = 0
+    print("writing training images.")
+    if len(gt_list) != 0:
+        for image in tqdm(gt_list):
+            torchvision.utils.save_image(image, os.path.join(gts_path, '{0:05d}'.format(count) + ".png"))
+            count += 1
+
+    count = 0
+    print("writing uncertainty.")
+    if len(uncertainty) != 0:
+        for image in tqdm(uncertainty):
+            torchvision.utils.save_image(image, os.path.join(uncertainty_path, '{0:05d}'.format(count) + ".png"))
+            count += 1
+
+    count = 0
+    print("writing rendering normal.")
+    if len(render_normal) != 0:
+        for image in tqdm(render_normal):
+            torchvision.utils.save_image(image, os.path.join(normal_path, '{0:05d}'.format(count) + ".png"))
+            count += 1
+
+    count = 0
+    print("writing rendering images.")
+    if len(render_images) != 0:
+        for image in tqdm(render_images):
+            torchvision.utils.save_image(image, os.path.join(render_path, '{0:05d}'.format(count) + ".png"))
+            count += 1
+
+    count = 0
+    print("writing mask images.")
+    if len(mask_list) != 0:
+        for image in tqdm(mask_list):
+            image = image.float()
+            torchvision.utils.save_image(image, os.path.join(masks_path, '{0:05d}'.format(count) + ".png"))
+            count += 1
+
+    count = 0
+    print("writing rendered depth images.")
+    if len(render_depths) != 0:
+        for image in tqdm(render_depths):
+            image = image.float() / 255.0
+            torchvision.utils.save_image(image, os.path.join(depth_path, '{0:05d}'.format(count) + ".png"))
+            count += 1
+
+    count = 0
+    print("writing gt depth images.")
+    if len(gt_depths) != 0:
+        for image in tqdm(gt_depths):
+            image = image.float() / 255.0
+            torchvision.utils.save_image(image, os.path.join(gtdepth_path, '{0:05d}'.format(count) + ".png"))
+            count += 1
+
+    render_array = torch.stack(render_images, dim=0).permute(0, 2, 3, 1)
+    render_array = (render_array * 255).clip(0, 255)
+    imageio.mimwrite(os.path.join(model_path, name, "ours_{}".format(iteration), 'ours_video.mp4'), render_array,
+                     fps=30, quality=8)
+
+    gt_array = torch.stack(gt_list, dim=0).permute(0, 2, 3, 1)
+    gt_array = (gt_array * 255).clip(0, 255)
+    imageio.mimwrite(os.path.join(model_path, name, "ours_{}".format(iteration), 'gt_video.mp4'), gt_array, fps=30,
+                     quality=8)
+
+    # Use a representative view to derive camera intrinsics for reconstruction
+    if len(views_cuda) > 0:
+        sample_view = views_cuda[0][1]
+        FoVy, FoVx = sample_view.FoVy, sample_view.FoVx
+        height, width = sample_view.image_height, sample_view.image_width
+    else:
+        FoVy = FoVx = height = width = 0
+    focal_y, focal_x = fov2focal(FoVy, height), fov2focal(FoVx, width)
+    camera_parameters = (focal_x, focal_y, width, height)
+
+    if reconstruct:
+        reconstruct_point_cloud(render_images, mask_list, render_depths, camera_parameters, name, pcd_path)
+
+
+def render_sets(dataset: ModelParams, opt, iteration: int, pipeline: PipelineParams, checkpoint,
+                skip_train: bool, skip_test: bool, skip_video: bool, pc: bool, rot_4d, force_sh_3d, gaussian_dim, time_duration,
+                num_pts, num_pts_ratio, batch_size=1, measure_raster_only: bool = False):
+    with torch.no_grad():
+        gaussians = GaussianModel(dataset.sh_degree,
+                                  gaussian_dim=gaussian_dim,
+                                  time_duration=time_duration,
+                                  rot_4d=rot_4d,
+                                  force_sh_3d=force_sh_3d,
+                                  sh_degree_t=2 if pipeline.eval_shfs_4d else 0)
+        scene = Scene(dataset,
+                      gaussians,
+                      load_iteration=iteration,
+                      shuffle=False,
+                      num_pts=num_pts,
+                      num_pts_ratio=num_pts_ratio,
+                      time_duration=time_duration)
+
+        gaussians.training_setup(opt)
+
+        if checkpoint:
+            (model_params, first_iter) = torch.load(checkpoint)
+            gaussians.restore(model_params, opt)
+
+        bg_color = [1, 1, 1] if dataset.white_background else [0, 0, 0]
+        background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
+
+        if not skip_train:
+            render_set(dataset.model_path, "train", scene.loaded_iter, scene.getTrainCameras(), gaussians, pipeline,
+                       background, reconstruct=pc, measure_raster_only=measure_raster_only)
+        if not skip_test:
+
+            render_set(dataset.model_path, "test", scene.loaded_iter, scene.getTestCameras(), gaussians, pipeline,
+                       background, reconstruct=pc, measure_raster_only=measure_raster_only)
+        if not skip_video:
+            render_set(dataset.model_path, "video", scene.loaded_iter, scene.getVideoCameras(), gaussians, pipeline,
+                       background, reconstruct=pc, measure_raster_only=measure_raster_only)
+
+
+def reconstruct_point_cloud(images, masks, depths, camera_parameters, name, pcd_path):
+    import cv2
+    import copy
+    frames = np.arange(len(images))
+    # frames = [0]
+    focal_x, focal_y, width, height = camera_parameters
+    for i_frame in frames:
+        rgb_tensor = images[i_frame]
+        rgb_np = rgb_tensor.mul(255).add_(0.5).clamp_(0, 255).permute(1, 2, 0).contiguous().to("cpu").numpy()
+        depth_np = depths[i_frame].cpu().numpy()
+        depth_np = depth_np.squeeze(0)
+        mask = masks[i_frame]
+        mask = mask.squeeze(0).cpu().numpy()
+
+        rgb_new = copy.deepcopy(rgb_np)
+
+        depth_smoother = (128, 64, 64)
+        depth_np = cv2.bilateralFilter(depth_np, depth_smoother[0], depth_smoother[1], depth_smoother[2])
+
+        close_depth = np.percentile(depth_np[depth_np != 0], 5)
+        inf_depth = np.percentile(depth_np, 95)
+        depth_np = np.clip(depth_np, close_depth, inf_depth)
+
+        rgb_im = o3d.geometry.Image(rgb_new.astype(np.uint8))
+        depth_im = o3d.geometry.Image(depth_np)
+        rgbd_image = o3d.geometry.RGBDImage.create_from_color_and_depth(rgb_im, depth_im,
+                                                                        convert_rgb_to_intensity=False)
+        pcd = o3d.geometry.PointCloud.create_from_rgbd_image(
+            rgbd_image,
+            o3d.camera.PinholeCameraIntrinsic(width, height, focal_x, focal_y, width / 2, width / 2),
+            project_valid_depth_only=True
+        )
+        pc_path = os.path.join(pcd_path, 'frame_{}.ply'.format(i_frame))
+        print('pcd:', pc_path)
+        o3d.io.write_point_cloud(pc_path, pcd)
+
+
+if __name__ == "__main__":
+    # Set up command line argument parser
+    parser = ArgumentParser(description="Testing script parameters")
+    # model = ModelParams(parser, sentinel=True)
+    # pipeline = PipelineParams(parser)
+    # hyperparam = ModelHiddenParams(parser)
+
+    lp = ModelParams(parser, sentinel=True)
+    op = OptimizationParams(parser)
+    hp = ModelHiddenParams(parser)
+    pp = PipelineParams(parser)
+
+    parser.add_argument("--config", type=str)
+    parser.add_argument("--iteration", default=None, type=int)
+    parser.add_argument("--skip_train", action="store_true")
+    parser.add_argument("--skip_test", action="store_true")
+    parser.add_argument("--quiet", action="store_true")
+    parser.add_argument("--pc", action="store_true")
+    parser.add_argument("--skip_video", action="store_true")
+    parser.add_argument("--checkpoint", type=str, default=None)
+
+    parser.add_argument("--gaussian_dim", type=int, default=3)
+    parser.add_argument("--time_duration", nargs=2, type=float, default=[-0.5, 0.5])
+    parser.add_argument('--num_pts', type=int, default=100_000)
+    parser.add_argument('--num_pts_ratio', type=float, default=1.0)
+    parser.add_argument("--rot_4d", action="store_true")
+    parser.add_argument("--force_sh_3d", action="store_true")
+    parser.add_argument("--batch_size", type=int, default=1)
+    parser.add_argument("--seed", type=int, default=6666)
+    parser.add_argument("--exhaust_test", action="store_true")
+    parser.add_argument("--measure_raster_only", action="store_true")
+
+    args = parser.parse_args(sys.argv[1:])
+    cfg = OmegaConf.load(args.config)
+
+    def recursive_merge(key, host):
+        if isinstance(host[key], DictConfig):
+            for key1 in host[key].keys():
+                recursive_merge(key1, host[key])
+        else:
+            assert hasattr(args, key), key
+            setattr(args, key, host[key])
+
+    for k in cfg.keys():
+        recursive_merge(k, cfg)
+
+    print("Rendering ", args.model_path)
+
+    # Initialize system state (RNG)
+    safe_state(args.quiet)
+    render_sets(lp.extract(args), op.extract(args), args.iteration, pp.extract(args), args.checkpoint, args.skip_train,
+                args.skip_test, args.skip_video, args.pc, args.rot_4d, args.force_sh_3d, args.gaussian_dim, args.time_duration,
+                args.num_pts, args.num_pts_ratio, args.batch_size, measure_raster_only=args.measure_raster_only)
