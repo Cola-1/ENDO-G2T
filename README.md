@@ -200,7 +200,7 @@ python metrics.py -m output/endonerf/pulling
 
 ## Acknowledgement
 
-Thanks the authors for their works: [StereoMIS](https://arxiv.org/abs/2304.08023v1), [diff-gaussian-rasterization-depth](https://github.com/leo-frank/diff-gaussian-rasterization-depth), [EndoNeRF](https://github.com/med-air/EndoNeRF), [Endo-4DGS](https://github.com/lastbasket/Endo-4DGS.git), [ST-Endo4DGS](https://ieeexplore.ieee.org/document/10980876)).
+Thanks the authors for their works: [StereoMIS](https://arxiv.org/abs/2304.08023v1), [diff-gaussian-rasterization-depth](https://github.com/leo-frank/diff-gaussian-rasterization-depth), [EndoNeRF](https://github.com/med-air/EndoNeRF), [Endo-4DGS](https://github.com/lastbasket/Endo-4DGS.git), [ST-Endo4DGS](https://ieeexplore.ieee.org/document/10980876).
 ## 📜 Citation
 
 If you find this work useful, please consider citing:
