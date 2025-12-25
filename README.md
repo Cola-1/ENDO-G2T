@@ -75,7 +75,7 @@ The  StereoMIS-P1 dataset is accessible for download via the following link: [Mi
 ---
 
 
-
+## Processing
 ### 1️⃣ Data Preprocessing
 
 Prepare monocular depth priors and auxiliary data before training.
@@ -137,7 +137,7 @@ python3 train.py \
 
 ### 4️⃣ Rendering
 
-#### (a) Rendering with Best Checkpoint (Skip Training Views & Video)
+#### Rendering with Best Checkpoint (Skip Training Views & Video)
 
 ```bash
 python render.py \
@@ -147,17 +147,7 @@ python render.py \
   --skip_video
 ```
 
-#### (b) FPS Measurement (Rasterization Only)
 
-```bash
-python render.py \
-  --config configs/endoNerf/pulling.yaml \
-  --iteration best \
-  --checkpoint output/endonerf/pulling/chkpnt_best.pth \
-  --skip_train \
-  --skip_video \
-  --measure_raster_only
-```
 
 ---
 
@@ -167,30 +157,12 @@ Compute quantitative metrics (PSNR, SSIM, LPIPS).
 
 ```bash
 python metrics.py -m output/endonerf/pulling
+
 ```
 
----
 
-### 6️⃣ Additional Example: Cutting Scene (FPS Only)
 
-```bash
-python render.py \
-  --config configs/endoNerf/cutting.yaml \
-  --checkpoint output/endonerf/cutting/chkpnt_best.pth \
-  --skip_train \
-  --skip_video \
-  --measure_raster_only
-```
 
----
-
-### 📝 Notes
-
-* All experiments are conducted on a single GPU.
-* FPS is reported in **raster-only mode**, excluding data loading and I/O.
-* For full-quality evaluation, no point pruning or frame filtering is applied.
-
----
 
 
 ---
@@ -200,6 +172,10 @@ python render.py \
 - [ ] release the code of the eval
 
 ---
+
+## Acknowledgement
+
+Thanks the authors for their works: [StereoMIS](https://arxiv.org/abs/2304.08023v1), [diff-gaussian-rasterization-depth](https://github.com/leo-frank/diff-gaussian-rasterization-depth), [EndoNeRF](https://github.com/med-air/EndoNeRF), [Endo-4DGS](https://github.com/lastbasket/Endo-4DGS.git), [ST-Endo4DGS](https://ieeexplore.ieee.org/document/10980876)).
 ## 📜 Citation
 
 If you find this work useful, please consider citing:
