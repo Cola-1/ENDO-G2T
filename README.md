@@ -1,12 +1,12 @@
 #  ENDO-G2T: Geometry-Guided and Temporally Aware Time-Embedded 4D Gaussian Splatting for Endoscopic Scenes
 
 <p align="center">
-  <img src="assets/1.png" alt="CountingFruit Teaser" width="95%">
+  <img src="assets/2.png" alt="CountingFruit Teaser" width="70%">
 </p>
 
 This repository contains the **official implementation** of the paper:
 
-**CountingFruit: Real-Time 3D Fruit Counting with Language-Guided Semantic Gaussian Splatting**  
+**ENDO-G2T: Geometry-Guided and Temporally Aware Time-Embedded 4D Gaussian Splatting for Endoscopic Scenes**  
 📄 [arXiv](https://arxiv.org/abs/2511.21367) 
 ---
 
@@ -37,7 +37,7 @@ Endoscopic (endo) video exhibits strong view-dependent effects such as speculari
 ---
 
 <p align="center">
-  <img src="assets/main.png" alt="CountingFruit Teaser" width="95%">
+  <img src="assets/1.png" alt="CountingFruit Teaser" width="70%">
 </p>
 
 ## Overview
