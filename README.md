@@ -4,6 +4,16 @@
   <img src="assets/2.png" alt="CountingFruit Teaser" width="70%">
 </p>
 
+<p align="center">
+  <strong>
+    <a href="https://YangleLiu.github.io/">Yangle Liu</a>,
+    <a href="https://uosfz.github.io/UOSFZ/">Fengze Li</a>,
+    Kan Liu,
+    <a href="https://scholar.xjtlu.edu.cn/en/persons/JiemingMa/">Jieming Ma</a>
+  </strong>
+</p>
+
+
 This repository contains the **official implementation** of the paper:
 
 **ENDO-G2T: Geometry-Guided and Temporally Aware Time-Embedded 4D Gaussian Splatting for Endoscopic Scenes**  
@@ -73,7 +83,18 @@ The  StereoMIS-P1 dataset is accessible for download via the following link: [Mi
 
 
 ---
+## Get started
 
+### Environment
+
+The hardware and software requirements are the same as those of the [3D Gaussian Splatting](https://github.com/graphdeco-inria/gaussian-splatting), which this code is built upon. To setup the environment, please run the following command:
+
+```shell
+git clone https://github.com/fudan-zvg/4d-gaussian-splatting
+cd DyGS
+conda env create --file environment.yml
+conda activate 4dgs
+```
 
 ## Processing
 ### 1️⃣ Data Preprocessing
