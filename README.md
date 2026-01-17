@@ -1,4 +1,8 @@
-#  ENDO-G2T: Geometry-Guided and Temporally Aware Time-Embedded 4D Gaussian Splatting for Endoscopic Scenes
+#  <h1 align="center">
+ENDO-G2T: Geometry-Guided and Temporally Aware Time-Embedded 4D Gaussian Splatting for Endoscopic Scenes
+<br>
+<span style="color:red;">ICASSP 2026 Accept!</span>
+</h1>
 
 <p align="center">
   <img src="assets/2.png" alt="CountingFruit Teaser" width="70%">
