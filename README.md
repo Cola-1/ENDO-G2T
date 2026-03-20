@@ -54,7 +54,7 @@ Endoscopic (endo) video exhibits strong view-dependent effects such as speculari
 ---
 
 <p align="center">
-  <img src="assets/1.png" alt="CountingFruit Teaser" width="70%">
+  <img src="assets/endo2.png" alt="CountingFruit Teaser" width="70%">
 </p>
 
 ## Overview
