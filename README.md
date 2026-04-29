@@ -17,7 +17,7 @@ ENDO-G2T: Geometry-Guided and Temporally Aware Time-Embedded 4D Gaussian Splatti
 </p>
 
 <p align="center">
-  || <a href="https://arxiv.org/pdf/2511.21367">Paper</a>
+  || <a href="https://ieeexplore.ieee.org/abstract/document/11460625">Paper</a>
   || <a href="https://arxiv.org/abs/2511.21367">arXiv</a> || 
 </p>
 
